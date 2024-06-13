@@ -337,7 +337,6 @@ public class TradeModule<T> : ModuleBase<SocketCommandContext> where T : PKM, ne
             _ = ReplyAndDeleteAsync("You already have an existing trade in the queue. Please wait until it is processed.", 2);
             return;
         }
-        var ignoreAutoOT = content.Contains("OT:") || content.Contains("TID:") || content.Contains("SID:");
         content = ReusableActions.StripCodeBlock(content);
         var set = new ShowdownSet(content);
         var template = AutoLegalityWrapper.GetTemplate(set);
@@ -446,7 +445,7 @@ public class TradeModule<T> : ModuleBase<SocketCommandContext> where T : PKM, ne
             pk.ResetPartyStats();
 
             var sig = Context.User.GetFavor();
-            await AddTradeToQueueAsync(code, Context.User.Username, pk, sig, Context.User, isBatchTrade: false, batchTradeNumber: 1, totalBatchTrades: 1, true, false, lgcode: lgcode, ignoreAutoOT: ignoreAutoOT, setEdited: setEdited).ConfigureAwait(false);
+            await AddTradeToQueueAsync(code, Context.User.Username, pk, sig, Context.User, isBatchTrade: false, batchTradeNumber: 1, totalBatchTrades: 1, true, false, lgcode: lgcode, setEdited: setEdited).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -466,23 +465,22 @@ public class TradeModule<T> : ModuleBase<SocketCommandContext> where T : PKM, ne
     [Summary("Makes the bot trade you the provided Pokémon file without showing the trade embed details.")]
     [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
     public Task HideTradeAsyncAttach(
-        [Summary("Trade Code")] int code,
-        [Summary("Ignore AutoOT")] bool ignoreAutoOT = false)
+        [Summary("Trade Code")] int code)
     {
         var sig = Context.User.GetFavor();
-        return HideTradeAsyncAttach(code, sig, Context.User, ignoreAutoOT: ignoreAutoOT);
+        return HideTradeAsyncAttach(code, sig, Context.User);
     }
 
     [Command("hidetrade")]
     [Alias("ht")]
     [Summary("Makes the bot trade you the attached file without showing the trade embed details.")]
     [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
-    private async Task HideTradeAsyncAttach([Summary("Ignore AutoOT")] bool ignoreAutoOT = false)
+    private async Task HideTradeAsyncAttach()
     {
         var userID = Context.User.Id;
         var code = Info.GetRandomTradeCode(userID);
         var sig = Context.User.GetFavor();
-        await HideTradeAsyncAttach(code, sig, Context.User, ignoreAutoOT: ignoreAutoOT).ConfigureAwait(false);
+        await HideTradeAsyncAttach(code, sig, Context.User).ConfigureAwait(false);
         if (Context.Message is IUserMessage userMessage)
         {
             _ = DeleteMessagesAfterDelayAsync(userMessage, null, 2);
@@ -1446,7 +1444,7 @@ public class TradeModule<T> : ModuleBase<SocketCommandContext> where T : PKM, ne
             la = new LegalityAnalysis(clone);
             if (la.Valid) pk = clone;
         }
-        await QueueHelper<T>.AddToQueueAsync(Context, code, trainerName, sig, pk!, PokeRoutineType.LinkTrade, tradeType, usr, isBatchTrade, batchTradeNumber, totalBatchTrades, isHiddenTrade, isMysteryEgg, lgcode, ignoreAutoOT: ignoreAutoOT, setEdited: setEdited).ConfigureAwait(false);
+        await QueueHelper<T>.AddToQueueAsync(Context, code, trainerName, sig, pk!, PokeRoutineType.LinkTrade, tradeType, usr, isBatchTrade, batchTradeNumber, totalBatchTrades, isHiddenTrade, isMysteryEgg, lgcode, setEdited: setEdited).ConfigureAwait(false);
     }
 
     public static List<Pictocodes> GenerateRandomPictocodes(int count)
