@@ -83,6 +83,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
 
         await server.LeaveAsync();
         await ReplyAsync($"Left the server '{server.Name}' and added it to the blacklist.");
+        await Context.Message.DeleteAsync();
     }
 
     [Command("unblacklistserver")]
@@ -108,6 +109,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         else
         {
             await ReplyAsync("An error occurred while trying to remove the server from the blacklist. Please check the server ID and try again.");
+            await Context.Message.DeleteAsync();
         }
     }
 
@@ -120,6 +122,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         var objects = users.Select(GetReference);
         SysCordSettings.Settings.GlobalSudoList.AddIfNew(objects);
         await ReplyAsync("Done.").ConfigureAwait(false);
+        await Context.Message.DeleteAsync();
     }
 
     [Command("removeSudo")]
@@ -131,6 +134,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         var objects = users.Select(GetReference);
         SysCordSettings.Settings.GlobalSudoList.RemoveAll(z => objects.Any(o => o.ID == z.ID));
         await ReplyAsync("Done.").ConfigureAwait(false);
+        await Context.Message.DeleteAsync();
     }
 
     [Command("addChannel")]
@@ -141,6 +145,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         var obj = GetReference(Context.Message.Channel);
         SysCordSettings.Settings.ChannelWhitelist.AddIfNew([obj]);
         await ReplyAsync("Done.").ConfigureAwait(false);
+        await Context.Message.DeleteAsync();
     }
 
     [Command("syncChannels")]
@@ -170,6 +175,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         else
         {
             await ReplyAsync("All channels from the whitelist are already in the announcement channels, no changes made.").ConfigureAwait(false);
+            await Context.Message.DeleteAsync();
         }
     }
 
@@ -181,6 +187,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         var obj = GetReference(Context.Message.Channel);
         SysCordSettings.Settings.ChannelWhitelist.RemoveAll(z => z.ID == obj.ID);
         await ReplyAsync("Done.").ConfigureAwait(false);
+        await Context.Message.DeleteAsync();
     }
 
     [Command("leave")]
@@ -191,6 +198,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
     {
         await ReplyAsync("Goodbye.").ConfigureAwait(false);
         await Context.Guild.LeaveAsync().ConfigureAwait(false);
+        await Context.Message.DeleteAsync();
     }
 
     [Command("leaveguild")]
@@ -214,6 +222,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
 
         await ReplyAsync($"Leaving {guild}.").ConfigureAwait(false);
         await guild.LeaveAsync().ConfigureAwait(false);
+        await Context.Message.DeleteAsync();
     }
 
     [Command("leaveall")]
@@ -225,6 +234,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         foreach (var guild in Context.Client.Guilds)
         {
             await guild.LeaveAsync().ConfigureAwait(false);
+            await Context.Message.DeleteAsync();
         }
     }
 
@@ -243,6 +253,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         {
             await ReplyAsync($"No bot found with the specified IP address ({ip}).").ConfigureAwait(false);
             return;
+            await Context.Message.DeleteAsync();
         }
 
         _ = Array.Empty<byte>();
@@ -278,6 +289,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
     public async Task RePeekGIF()
     {
         await Context.Channel.SendMessageAsync("Processing GIF request...").ConfigureAwait(false);
+        await Context.Message.DeleteAsync();
 
         // Offload processing to a separate task so we dont hold up gateway tasks
         _ = Task.Run(async () =>
@@ -401,6 +413,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
     {
         await Context.Channel.EchoAndReply("Shutting down... goodbye! **Bot services are going offline.**").ConfigureAwait(false);
         Environment.Exit(0);
+        await Context.Message.DeleteAsync();
     }
 
     [Command("dme")]
