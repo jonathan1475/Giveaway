@@ -156,6 +156,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
     {
         var whitelist = SysCordSettings.Settings.ChannelWhitelist.List;
         var announcementList = SysCordSettings.Settings.AnnouncementChannels.List;
+        await Context.Message.DeleteAsync();
 
         bool changesMade = false;
 
@@ -175,7 +176,6 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         else
         {
             await ReplyAsync("All channels from the whitelist are already in the announcement channels, no changes made.").ConfigureAwait(false);
-            await Context.Message.DeleteAsync();
         }
     }
 
@@ -221,8 +221,8 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         }
 
         await ReplyAsync($"Leaving {guild}.").ConfigureAwait(false);
-        await guild.LeaveAsync().ConfigureAwait(false);
         await Context.Message.DeleteAsync();
+        await guild.LeaveAsync().ConfigureAwait(false);
     }
 
     [Command("leaveall")]
@@ -253,7 +253,6 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
         {
             await ReplyAsync($"No bot found with the specified IP address ({ip}).").ConfigureAwait(false);
             return;
-            await Context.Message.DeleteAsync();
         }
 
         _ = Array.Empty<byte>();
@@ -280,6 +279,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
             .WithFooter(new EmbedFooterBuilder { Text = "Here's your screenshot." });
 
         await Context.Channel.SendFileAsync(ms, img, embed: embed.Build());
+        await Context.Message.DeleteAsync();
     }
 
     [Command("video")]

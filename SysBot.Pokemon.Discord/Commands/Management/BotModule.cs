@@ -116,6 +116,7 @@ namespace SysBot.Pokemon.Discord
 
             bot.Pause();
             await ReplyAsync("Bot has been set to idle.").ConfigureAwait(false);
+            await Context.Message.DeleteAsync();
         }
 
         [Command("botChange")]
@@ -135,6 +136,7 @@ namespace SysBot.Pokemon.Discord
 
             bot.Bot.Config.Initialize(task);
             await ReplyAsync($"Bot has changed its routine to {task}.").ConfigureAwait(false);
+            await Context.Message.DeleteAsync();
         }
 
         [Command("botRestart")]
