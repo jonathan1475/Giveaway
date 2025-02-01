@@ -96,7 +96,7 @@ public class BotSource<T>(RoutineExecutor<T> Bot)
         var ae = finishedTask.Exception;
         if (ae == null)
         {
-            LogUtil.LogError("Bot has stopped without error.", ident);
+            LogUtil.LogError("<@754156803906076712> Bot has stopped without error.", ident);
             return;
         }
 
