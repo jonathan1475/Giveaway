@@ -39,7 +39,11 @@ public static class StringsUtil
             return false;
 
         text = text.Replace(" ", "");
+
         if (text.Contains("pkm", StringComparison.InvariantCultureIgnoreCase))
+            return true;
+
+        if (NameBlacklist.Any(name => text.Contains(name, StringComparison.InvariantCultureIgnoreCase)))
             return true;
 
         if (TLD.Any(z => text.EndsWith(z, StringComparison.InvariantCultureIgnoreCase)))
@@ -48,6 +52,7 @@ public static class StringsUtil
             return true;
         if (TLD.Any(z => text.StartsWith(z, StringComparison.InvariantCultureIgnoreCase)))
             return true;
+
         return false;
     }
 }
