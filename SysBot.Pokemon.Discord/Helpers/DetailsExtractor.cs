@@ -50,6 +50,12 @@ public static class DetailsExtractor<T> where T : PKM, new()
             (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowGVs && !string.IsNullOrWhiteSpace(embedData.GVsDisplay) ? $"**GVs**: {embedData.GVsDisplay}\n" : "") +
             (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowAVs && !string.IsNullOrWhiteSpace(embedData.AVsDisplay) ? $"**AVs**: {embedData.AVsDisplay}\n" : "");
 
+        if (pk is IHomeTrack homeTrack)
+        {
+            leftSideContent += (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowTracker
+                ? $"**Home Tracker:** {(homeTrack.HasTracker ? homeTrack.Tracker.ToString() : "None")}\n"
+                : "");
+        }
 
         leftSideContent = leftSideContent.TrimEnd('\n');
         embedBuilder.AddField($"**{embedData.SpeciesName}{(string.IsNullOrEmpty(embedData.FormName) ? "" : $"-{embedData.FormName}")} {embedData.SpecialSymbols}**", leftSideContent, inline: true);
@@ -434,8 +440,10 @@ public class EmbedData
     /// <summary>Formatted IVs display string.</summary>
     public string? IVsDisplay { get; set; }
 
+    /// <summary>Formatted GVs display string.</summary>
     public string? GVsDisplay { get; set; }
 
+    /// <summary>Formatted AVs display string.</summary>
     public string? AVsDisplay { get; set; }
 
     /// <summary>Pokémon language.</summary>
@@ -443,6 +451,9 @@ public class EmbedData
 
     /// <summary>Pokémon level.</summary>
     public int Level { get; set; }
+
+    /// <summary>Home Tracker.</summary>
+    public int Tracker { get; set; }
 
     /// <summary>Met date.</summary>
     public string? MetDate { get; set; }
