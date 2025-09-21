@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
@@ -10,11 +12,13 @@ namespace SysBot.Pokemon.Discord.Helpers
     {
         private readonly DiscordSocketClient _client;
         private readonly ulong _forwardTargetId;
+        private readonly List<string> _commandPrefixes;
 
-        public DMRelayService(DiscordSocketClient client, ulong forwardTargetId)
+        public DMRelayService(DiscordSocketClient client, ulong forwardTargetId, List<string> commandPrefixes)
         {
             _client = client;
             _forwardTargetId = forwardTargetId;
+            _commandPrefixes = commandPrefixes ?? new List<string> { "$", "%" };
 
             if (_forwardTargetId != 0)
                 _client.MessageReceived += HandleMessageAsync;
@@ -26,9 +30,10 @@ namespace SysBot.Pokemon.Discord.Helpers
             if (umsg.Author.IsBot) return;
             if (umsg.Channel is not SocketDMChannel dm) return;
 
-            // Skip commands
+            // Skip commands - check against all configured prefixes
             int argPos = 0;
-            if (umsg.HasCharPrefix('.', ref argPos) || umsg.HasMentionPrefix(_client.CurrentUser, ref argPos))
+            if (umsg.HasMentionPrefix(_client.CurrentUser, ref argPos) ||
+                _commandPrefixes.Any(prefix => umsg.HasStringPrefix(prefix, ref argPos)))
                 return;
 
             // Build the base forward message
