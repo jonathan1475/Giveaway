@@ -32,7 +32,7 @@ namespace SysBot.Pokemon
         [Description("Extra time in milliseconds to wait between attempts to reconnect. Base time is 30 seconds.")]
         public int ExtraReconnectDelay { get; set; }
 
-        [Description("[SWSH/SV/PLZA] Extra time in milliseconds to wait after clicking + to connect to Y-Comm (SWSH), L to connect online (SV), or after connecting to Portal (PLZA). Base time for PLZA is 8 seconds.")]
+        [Description("[SWSH/SV] Extra time in milliseconds to wait after clicking + to connect to Y-Comm (SWSH) or L to connect online (SV).")]
         public int ExtraTimeConnectOnline { get; set; }
 
         [Description("[BDSP] Extra time in milliseconds to wait for the Union Room to load before trying to call for a trade.")]
