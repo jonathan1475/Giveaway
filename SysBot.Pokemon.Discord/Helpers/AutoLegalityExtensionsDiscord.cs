@@ -51,6 +51,7 @@ public static class AutoLegalityExtensionsDiscord
                 await channel.SendMessageAsync(imsg).ConfigureAwait(false);
                 return;
             }
+
             var msg = $"Here's your ({result}) legalized PKM for {spec} ({la.EncounterOriginal.Name})!";
             await channel.SendPKMAsync(pkm, msg + $"\n{ReusableActions.GetFormattedShowdownText(pkm)}").ConfigureAwait(false);
         }

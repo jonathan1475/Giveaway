@@ -271,8 +271,7 @@ public sealed partial class Main : Form
         {
             await Task.Delay(3_500).ConfigureAwait(false);
             SaveCurrentConfig();
-
-            LogUtil.LogInfo("Form", "Starting all bots...");
+            LogUtil.LogInfo("Restarting all the consoles...", "Form");
             RunningEnvironment.InitializeStart();
             SendAll(BotControlCommand.RebootAndStop);
             await Task.Delay(5_000).ConfigureAwait(false); // Add a delay before restarting the bot

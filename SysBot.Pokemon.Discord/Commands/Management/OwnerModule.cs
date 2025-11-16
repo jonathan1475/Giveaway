@@ -280,85 +280,99 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
     {
         await Context.Channel.SendMessageAsync("Processing GIF request...").ConfigureAwait(false);
 
-        try
+        // Offload processing to a separate task so we dont hold up gateway tasks
+        _ = Task.Run(async () =>
         {
-            string ip = OwnerModule<T>.GetBotIPFromJsonConfig();
-            var source = new CancellationTokenSource();
-            var token = source.Token;
-            var bot = SysCord<T>.Runner.GetBot(ip);
-
-            if (bot == null)
+            try
             {
-                await ReplyAsync($"No bot found with the specified IP address ({ip}).").ConfigureAwait(false);
-                return;
-            }
+                string ip = OwnerModule<T>.GetBotIPFromJsonConfig();
+                var source = new CancellationTokenSource();
+                var token = source.Token;
+                var bot = SysCord<T>.Runner.GetBot(ip);
 
-            const int screenshotCount = 10;
-            var screenshotInterval = TimeSpan.FromSeconds(0.1 / 10);
-            var gifFrames = new List<byte[]>();
-
-            for (int i = 0; i < screenshotCount; i++)
-            {
-                byte[] bytes;
-                try
+                if (bot == null)
                 {
-                    bytes = await bot.Bot.Connection.PixelPeek(token).ConfigureAwait(false) ?? Array.Empty<byte>();
-                }
-                catch (Exception ex)
-                {
-                    await ReplyAsync($"Error while fetching pixels: {ex.Message}").ConfigureAwait(false);
+                    await ReplyAsync($"No bot found with the specified IP address ({ip}).").ConfigureAwait(false);
                     return;
                 }
 
-                if (bytes.Length == 0)
-                {
-                    await ReplyAsync("No screenshot data received.").ConfigureAwait(false);
-                    return;
-                }
+                const int screenshotCount = 10;
+                var screenshotInterval = TimeSpan.FromSeconds(0.1 / 10);
+#pragma warning disable CA1416 // Validate platform compatibility
+                var gifFrames = new List<System.Drawing.Image>();
+#pragma warning restore CA1416 // Validate platform compatibility
 
-                gifFrames.Add(bytes);
-
-                if (i < screenshotCount - 1)
+                for (int i = 0; i < screenshotCount; i++)
                 {
+                    byte[] bytes;
+                    try
+                    {
+                        bytes = await bot.Bot.Connection.PixelPeek(token).ConfigureAwait(false) ?? [];
+                    }
+                    catch (Exception ex)
+                    {
+                        await ReplyAsync($"Error while fetching pixels: {ex.Message}").ConfigureAwait(false);
+                        return;
+                    }
+
+                    if (bytes.Length == 0)
+                    {
+                        await ReplyAsync("No screenshot data received.").ConfigureAwait(false);
+                        return;
+                    }
+
+                    await using (var ms = new MemoryStream(bytes))
+                    {
+#pragma warning disable CA1416 // Validate platform compatibility
+                        using var bitmap = new Bitmap(ms);
+#pragma warning restore CA1416 // Validate platform compatibility
+#pragma warning disable CA1416 // Validate platform compatibility
+                        var frame = bitmap.Clone(new Rectangle(0, 0, bitmap.Width, bitmap.Height), System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+#pragma warning restore CA1416 // Validate platform compatibility
+#pragma warning disable CA1416 // Validate platform compatibility
+                        gifFrames.Add(frame);
+#pragma warning restore CA1416 // Validate platform compatibility
+                    }
+
                     await Task.Delay(screenshotInterval).ConfigureAwait(false);
                 }
-            }
 
-            await using (var ms = new MemoryStream())
-            {
-                await CreateGifAsync(ms, gifFrames).ConfigureAwait(false);
-
-                ms.Position = 0;
-                const string gifFileName = "screenshot.gif";
-                var embed = new EmbedBuilder { ImageUrl = $"attachment://{gifFileName}", Color = (DiscordColor?)Color.Red }
-                    .WithFooter(new EmbedFooterBuilder { Text = "Here's your GIF." });
-
-                await Context.Channel.SendFileAsync(ms, gifFileName, embed: embed.Build()).ConfigureAwait(false);
-            }
-
-            gifFrames.Clear();
-        }
-        catch (Exception ex)
-        {
-            await ReplyAsync($"Error while processing GIF: {ex.Message}").ConfigureAwait(false);
-        }
-    }
-
-    private async Task CreateGifAsync(Stream outputStream, List<byte[]> frames)
-    {
+                await using (var ms = new MemoryStream())
+                {
+                    using (var gif = new AnimatedGifCreator(ms, 200))
+                    {
+                        foreach (var frame in gifFrames)
+                        {
+                            gif.AddFrame(frame);
 #pragma warning disable CA1416 // Validate platform compatibility
-        using var gif = new AnimatedGifCreator(outputStream, 200);
-        foreach (var frameBytes in frames)
-        {
-            using (var ms = new MemoryStream(frameBytes))
-            using (var bitmap = new Bitmap(ms))
-            using (var frame = bitmap.Clone(new Rectangle(0, 0, bitmap.Width, bitmap.Height), System.Drawing.Imaging.PixelFormat.Format32bppArgb))
-            {
-                gif.AddFrame(frame);
-            }
-            await Task.Yield(); // Allow other tasks to run
-        }
+                            frame.Dispose();
 #pragma warning restore CA1416 // Validate platform compatibility
+                        }
+                    }
+
+                    ms.Position = 0;
+                    const string gifFileName = "screenshot.gif";
+                    var embed = new EmbedBuilder { ImageUrl = $"attachment://{gifFileName}", Color = (DiscordColor?)Color.Red }
+                        .WithFooter(new EmbedFooterBuilder { Text = "Here's your GIF." });
+
+                    await Context.Channel.SendFileAsync(ms, gifFileName, embed: embed.Build()).ConfigureAwait(false);
+                }
+
+                foreach (var frame in gifFrames)
+                {
+#pragma warning disable CA1416 // Validate platform compatibility
+                    frame.Dispose();
+#pragma warning restore CA1416 // Validate platform compatibility
+                }
+#pragma warning disable CA1416 // Validate platform compatibility
+                gifFrames.Clear();
+#pragma warning restore CA1416 // Validate platform compatibility
+            }
+            catch (Exception ex)
+            {
+                await ReplyAsync($"Error while processing GIF: {ex.Message}").ConfigureAwait(false);
+            }
+        });
     }
 
     private static string GetBotIPFromJsonConfig()
@@ -368,15 +382,10 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
             var jsonData = File.ReadAllText(PokeBot.ConfigPath);
             var config = JObject.Parse(jsonData);
 
-            var botsArray = config["Bots"] as JArray;
-            if (botsArray == null || botsArray.Count == 0)
-                return "192.168.1.1";
-            
-            var firstBot = botsArray[0] as JObject;
-            var connection = firstBot?["Connection"] as JObject;
-            var ip = connection?["IP"]?.ToString();
-            
-            return ip ?? "192.168.1.1";
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+            var ip = config["Bots"][0]["Connection"]["IP"].ToString();
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
+            return ip;
         }
         catch (Exception ex)
         {

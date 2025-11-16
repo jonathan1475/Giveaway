@@ -202,7 +202,7 @@ public sealed class SwitchSocketAsync : SwitchSocket, ISwitchConnectionAsync
 
     private async Task<byte[]> FlexRead(CancellationToken token)
     {
-        List<byte> flexBuffer = [];
+        List<byte> flexBuffer = new();
         int available = Connection.Available;
         Connection.ReceiveTimeout = 1_000;
 
@@ -217,7 +217,7 @@ public sealed class SwitchSocketAsync : SwitchSocket, ISwitchConnectionAsync
             catch (Exception ex)
             {
                 LogError($"Socket exception thrown while receiving data:\n{ex.Message}");
-                return Array.Empty<byte>();
+                return [];
             }
 
             await Task.Delay((MaximumTransferSize / DelayFactor) + BaseDelay, token).ConfigureAwait(false);

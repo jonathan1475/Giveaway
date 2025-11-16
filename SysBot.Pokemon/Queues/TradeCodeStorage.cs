@@ -3,7 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+
 namespace SysBot.Pokemon;
+
 public class TradeCodeStorage
 {
     private const string FileName = "tradecodes.json";
@@ -13,7 +15,9 @@ public class TradeCodeStorage
         WriteIndented = true
     };
     private Dictionary<ulong, TradeCodeDetails>? _tradeCodeDetails;
+
     public TradeCodeStorage() => LoadFromFile();
+
     public bool DeleteTradeCode(ulong trainerID)
     {
         LoadFromFile();
@@ -24,6 +28,7 @@ public class TradeCodeStorage
         }
         return false;
     }
+
     public int GetTradeCode(ulong trainerID)
     {
         LoadFromFile();
@@ -38,6 +43,7 @@ public class TradeCodeStorage
         SaveToFile();
         return code;
     }
+
     public int GetTradeCount(ulong trainerID)
     {
         LoadFromFile();
@@ -47,6 +53,7 @@ public class TradeCodeStorage
         }
         return 0;
     }
+
     public TradeCodeDetails? GetTradeDetails(ulong trainerID)
     {
         LoadFromFile();
@@ -56,6 +63,7 @@ public class TradeCodeStorage
         }
         return null;
     }
+
     public void UpdateTradeDetails(ulong trainerID, string ot, int tid, int sid)
     {
         LoadFromFile();
@@ -64,27 +72,6 @@ public class TradeCodeStorage
             details.OT = ot;
             details.TID = tid;
             details.SID = sid;
-            SaveToFile();
-        }
-    }
-
-    // New overload that includes gender and language parameters
-    public void UpdateTradeDetails(ulong trainerID, string ot, int tid, int sid, byte? gender = null, int? language = null)
-    {
-        LoadFromFile();
-        if (_tradeCodeDetails!.TryGetValue(trainerID, out var details))
-        {
-            details.OT = ot;
-            details.TID = tid;
-            details.SID = sid;
-
-            // Only update if values are provided
-            if (gender.HasValue)
-                details.Gender = gender;
-
-            if (language.HasValue)
-                details.Language = language;
-
             SaveToFile();
         }
     }
@@ -100,11 +87,13 @@ public class TradeCodeStorage
         }
         return false;
     }
+
     private static int GenerateRandomTradeCode()
     {
         var settings = new TradeSettings();
         return settings.GetRandomTradeCode();
     }
+
     private void LoadFromFile()
     {
         if (File.Exists(FileName))
@@ -114,9 +103,10 @@ public class TradeCodeStorage
         }
         else
         {
-            _tradeCodeDetails = [];
+            _tradeCodeDetails = new Dictionary<ulong, TradeCodeDetails>();
         }
     }
+
     private void SaveToFile()
     {
         try
@@ -137,6 +127,7 @@ public class TradeCodeStorage
             LogUtil.LogInfo("TradeCodeStorage", $"An error occurred while saving trade codes to file: {ex.Message}");
         }
     }
+
     public class TradeCodeDetails
     {
         public int Code { get; set; }
@@ -144,8 +135,5 @@ public class TradeCodeStorage
         public int SID { get; set; }
         public int TID { get; set; }
         public int TradeCount { get; set; }
-        // Optional trainer properties
-        public byte? Gender { get; set; }
-        public int? Language { get; set; }
     }
 }
