@@ -86,6 +86,7 @@ public sealed partial class Main : Form
         ProgramMode.LA => new PokeBotRunnerImpl<PA8>(cfg.Hub, new BotFactory8LA(), cfg),
         ProgramMode.SV => new PokeBotRunnerImpl<PK9>(cfg.Hub, new BotFactory9SV(), cfg),
         ProgramMode.LGPE => new PokeBotRunnerImpl<PB7>(cfg.Hub, new BotFactory7LGPE(), cfg),
+        ProgramMode.PLZA => new PokeBotRunnerImpl<PA9>(cfg.Hub, new BotFactory9PLZA(), cfg),
         _ => throw new IndexOutOfRangeException("Unsupported mode."),
     };
 
@@ -290,6 +291,7 @@ public sealed partial class Main : Form
             ProgramMode.BDSP => Resources.bdsp_mode_image,
             ProgramMode.LA => Resources.pla_mode_image,
             ProgramMode.LGPE => Resources.lgpe_mode_image,
+            ProgramMode.PLZA => Resources.plza_mode_image,
             _ => null,
         };
         FLP_Bots.BackgroundImageLayout = ImageLayout.Center;
