@@ -254,8 +254,67 @@ public sealed record TradeQueueInfo<T>(PokeTradeHub<T> Hub)
     {
         lock (_sync)
         {
-            if (UsersInQueue.Any(z => z.UserID == userID) && !allowMultiple && !sudo)
-                return QueueResultAdd.AlreadyInQueue;
+            // Check if user is already in queue (sudo users bypass this check entirely)
+            if (!sudo)
+            {
+                // Get ALL existing entries for this user (not just the first one)
+                var existingEntries = UsersInQueue.Where(z => z.UserID == userID).ToList();
+
+                if (existingEntries.Count > 0)
+                {
+                    // For regular trades (allowMultiple = false), ALWAYS block duplicate entries
+                    // This prevents users from joining the queue multiple times
+                    if (!allowMultiple)
+                    {
+                        LogUtil.LogInfo(nameof(TradeQueueInfo<T>),
+                            $"Blocked duplicate queue entry: User {userID} already has {existingEntries.Count} entry(s) in queue");
+                        return QueueResultAdd.AlreadyInQueue;
+                    }
+
+                    // For batch trades (allowMultiple = true), only allow if same UniqueTradeID
+                    // This allows multiple Pokemon from the same batch, but prevents starting a new batch
+                    if (existingEntries.Any(e => e.UniqueTradeID != trade.Trade.UniqueTradeID))
+                    {
+                        LogUtil.LogInfo(nameof(TradeQueueInfo<T>),
+                            $"Blocked different batch: User {userID} trying to queue UniqueTradeID {trade.Trade.UniqueTradeID} " +
+                            $"but already has UniqueTradeID {existingEntries.First().UniqueTradeID}");
+                        return QueueResultAdd.AlreadyInQueue;
+                    }
+                }
+            }
+
+            // Check if queue is full (unless user is sudo)
+            if (!sudo && UsersInQueue.Count >= Hub.Config.Queues.MaxQueueCount)
+                return QueueResultAdd.QueueFull;
+
+            // Blocked item validation - check if Pokemon has blocked held item using PKHeX's ItemRestrictions
+            // This central check ensures NO bypass is possible from any entry point
+            // Check the main pokemon
+            if (TradeExtensions<T>.IsItemBlocked(trade.Trade.TradeData))
+            {
+                var held = trade.Trade.TradeData.HeldItem;
+                var itemName = held > 0 ? GameInfo.GetStrings("en").Item[held] : "(none)";
+                LogUtil.LogInfo(nameof(TradeQueueInfo<T>),
+                    $"Blocked trade for user {userID}: held item '{itemName}' is not allowed");
+                return QueueResultAdd.NotAllowedItem;
+            }
+
+            // For batch trades, also check all pokemon in the batch
+            if (trade.Trade.BatchTrades != null && trade.Trade.BatchTrades.Count > 0)
+            {
+                for (int i = 0; i < trade.Trade.BatchTrades.Count; i++)
+                {
+                    if (TradeExtensions<T>.IsItemBlocked(trade.Trade.BatchTrades[i]))
+                    {
+                        var held = trade.Trade.BatchTrades[i].HeldItem;
+                        var itemName = held > 0 ? GameInfo.GetStrings("en").Item[held] : "(none)";
+                        var speciesName = GameInfo.Strings.Species[trade.Trade.BatchTrades[i].Species];
+                        LogUtil.LogInfo(nameof(TradeQueueInfo<T>),
+                            $"Blocked batch trade for user {userID}: Pokemon #{i + 1} ({speciesName}) has held item '{itemName}' which is not allowed");
+                        return QueueResultAdd.NotAllowedItem;
+                    }
+                }
+            }
 
             if (Hub.Config.Legality.ResetHOMETracker && trade.Trade.TradeData is IHomeTrack t)
                 t.Tracker = 0;

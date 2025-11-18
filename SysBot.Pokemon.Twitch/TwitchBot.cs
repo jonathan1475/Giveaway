@@ -1,5 +1,6 @@
 using PKHeX.Core;
 using SysBot.Base;
+using SysBot.Pokemon.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -119,6 +120,14 @@ namespace SysBot.Pokemon.Twitch
 
             var trainer = new PokeTradeTrainerInfo(name, ulong.Parse(e.WhisperMessage.UserId));
             var notifier = new TwitchTradeNotifier<T>(pk, trainer, code, e.WhisperMessage.Username, client, Channel, Hub.Config.Twitch);
+
+            // Block non-tradable items using PKHeX's ItemRestrictions
+            if (TradeExtensions<T>.IsItemBlocked(pk))
+            {
+                var itemName = pk.HeldItem > 0 ? PKHeX.Core.GameInfo.GetStrings("en").Item[pk.HeldItem] : "(none)";
+                msg = $"@{name}: Trade blocked — the held item '{itemName}' cannot be traded.";
+                return false;
+            }
             var tt = type == PokeRoutineType.SeedCheck ? PokeTradeType.Seed : PokeTradeType.Specific;
             var detail = new PokeTradeDetail<T>(pk, trainer, notifier, tt, code, sig == RequestSignificance.Favored);
             var uniqueTradeID = GenerateUniqueTradeID();
