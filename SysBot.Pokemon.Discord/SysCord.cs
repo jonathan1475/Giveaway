@@ -34,6 +34,9 @@ public sealed class SysCord<T> where T : PKM, new()
     private readonly Dictionary<ulong, ulong> _announcementMessageIds = [];
     private readonly DiscordSocketClient _client;
     private readonly CommandService _commands;
+    private readonly HashSet<ITradeBot> _connectedBots = [];
+    private readonly object _botConnectionLock = new object();
+    private bool _handlersRegistered = false;
 
     private readonly IServiceProvider _services;
 
@@ -61,8 +64,45 @@ public sealed class SysCord<T> where T : PKM, new()
         {
             if (bot is ITradeBot tradeBot)
             {
-                tradeBot.ConnectionError += async (sender, ex) => await HandleBotStop();
-                tradeBot.ConnectionSuccess += async (sender, e) => await HandleBotStart();
+                tradeBot.ConnectionSuccess += async (sender, e) =>
+                {
+                    bool shouldHandleStart = false;
+
+                    lock (_botConnectionLock)
+                    {
+                        _connectedBots.Add(tradeBot);
+                        if (_connectedBots.Count == 1)
+                        {
+                            // First bot connected, handle start outside lock
+                            shouldHandleStart = true;
+                        }
+                    }
+
+                    if (shouldHandleStart)
+                    {
+                        await HandleBotStart();
+                    }
+                };
+
+                tradeBot.ConnectionError += async (sender, ex) =>
+                {
+                    bool shouldHandleStop = false;
+
+                    lock (_botConnectionLock)
+                    {
+                        _connectedBots.Remove(tradeBot);
+                        if (_connectedBots.Count == 0)
+                        {
+                            // All bots disconnected, handle stop outside lock
+                            shouldHandleStop = true;
+                        }
+                    }
+
+                    if (shouldHandleStop)
+                    {
+                        await HandleBotStop();
+                    }
+                };
             }
         }
         SysCordSettings.Manager = Manager;
@@ -78,12 +118,6 @@ public sealed class SysCord<T> where T : PKM, new()
             // (ex. checking Reactions, checking the content of edited/deleted messages),
             // you must set the MessageCacheSize. You may adjust the number as needed.
             //MessageCacheSize = 50,
-        });
-
-        _client = new DiscordSocketClient(new DiscordSocketConfig
-        {
-            LogLevel = LogSeverity.Info,
-            GatewayIntents = Guilds | GuildMessages | DirectMessages | GuildMembers | GuildPresences | MessageContent,
         });
 
         // ===== DM Relay Setup =====
@@ -369,8 +403,13 @@ public sealed class SysCord<T> where T : PKM, new()
         }
 
         // Subscribe a handler to see if a message invokes a command.
-        _client.Ready += LoadLoggingAndEcho;
-        _client.MessageReceived += HandleMessageAsync;
+        // Guard to prevent duplicate event handler registration
+        if (!_handlersRegistered)
+        {
+            _client.Ready += LoadLoggingAndEcho;
+            _client.MessageReceived += HandleMessageAsync;
+            _handlersRegistered = true;
+        }
     }
 
     public async Task MainAsync(string apiToken, CancellationToken token)
