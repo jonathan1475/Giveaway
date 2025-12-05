@@ -115,10 +115,6 @@ namespace SysBot.Pokemon.Discord
 
         private static string? GetHiddenAbilityName(ushort species, EntityContext context)
         {
-            // First check PKHeX's breed legality
-            if (!AbilityBreedLegality.IsHiddenPossibleHOME(species))
-                return null;
-
             var personalTable = GetPersonalTable(context);
             if (personalTable == null)
                 return null;
@@ -129,6 +125,7 @@ namespace SysBot.Pokemon.Discord
                 if (pi is IPersonalAbility12H piH)
                 {
                     var hiddenAbilityID = piH.AbilityH;
+                    // Check if the hidden ability is different from regular abilities and valid
                     if (hiddenAbilityID > 0 && hiddenAbilityID < GameInfo.Strings.Ability.Count)
                         return GameInfo.Strings.Ability[hiddenAbilityID];
                 }
