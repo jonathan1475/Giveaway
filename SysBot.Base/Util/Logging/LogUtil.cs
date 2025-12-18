@@ -54,8 +54,156 @@ public static class LogUtil
 
     public static void LogInfo(string message, string identity)
     {
-        Logger.Log(LogLevel.Info, $"{identity} {message}");
-        Log(message, identity);
+        if (string.IsNullOrWhiteSpace(botName))
+            return "UnknownBot";
+
+        // Check if this is a system component and should be consolidated
+        if (LogConfig.ConsolidateSystemLogs)
+        {
+            foreach (var systemIdentity in LogConfig.SystemIdentities)
+            {
+                if (botName.Equals(systemIdentity, StringComparison.OrdinalIgnoreCase) ||
+                    botName.StartsWith(systemIdentity + " ", StringComparison.OrdinalIgnoreCase) ||
+                    botName.StartsWith(systemIdentity + ":", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "System";
+                }
+            }
+        }
+
+        // Keep the full identifier (e.g., "HeXbyt3-483256", "USB-1")
+        // Just sanitize invalid file system characters
+        var invalid = Path.GetInvalidFileNameChars();
+        var sanitized = string.Join("_", botName.Split(invalid, StringSplitOptions.RemoveEmptyEntries));
+
+        // Remove any trailing/leading whitespace or underscores
+        sanitized = sanitized.Trim('_', ' ');
+
+        return string.IsNullOrWhiteSpace(sanitized) ? "UnknownBot" : sanitized;
+    }
+
+    /// <summary>
+    /// Checks if an identity is a trainer identifier (Name-XXXXXX format)
+    /// </summary>
+    private static bool IsTrainerIdentifier(string identity)
+    {
+        return identity.Contains('-') && System.Text.RegularExpressions.Regex.IsMatch(identity, @"-\d{6}$");
+    }
+
+    /// <summary>
+    /// Checks if identity should skip per-bot logging (system-wide services)
+    /// </summary>
+    private static bool IsGlobalIdentity(string identity)
+    {
+        return LogConfig.SystemIdentities.Any(prefix => identity.Equals(prefix, StringComparison.OrdinalIgnoreCase) ||
+                                                         identity.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Flushes buffered logs from early identifier (IP/USB) to trainer folder
+    /// </summary>
+    public static void FlushBufferedLogs(string earlyIdentifier, string trainerIdentifier)
+    {
+        if (LogBuffer.TryRemove(earlyIdentifier, out var bufferedLogs))
+        {
+            var botLogger = GetOrCreateBotLogger(trainerIdentifier);
+            foreach (var entry in bufferedLogs)
+            {
+                botLogger.Log(entry.Level, entry.Message);
+            }
+        }
+    }
+
+    public static void LogError(string message, string identity)
+    {
+        // Log to master log
+        if (LogConfig.EnableMasterLog)
+            Logger.Log(LogLevel.Error, $"{identity} {message}");
+
+        // Handle per-bot logging
+        if (LogConfig.EnablePerBotLogging && !IsGlobalIdentity(identity))
+        {
+            if (IsTrainerIdentifier(identity))
+            {
+                // Identified bot - log directly to trainer folder
+                var botLogger = GetOrCreateBotLogger(identity);
+                botLogger.Log(LogLevel.Error, message);
+            }
+            else
+            {
+                // Early bot identifier (IP/USB) - buffer for later
+                LogBuffer.GetOrAdd(identity, _ => new List<BufferedLogEntry>())
+                    .Add(new BufferedLogEntry(LogLevel.Error, message, DateTime.Now));
+            }
+        }
+
+        // Forward to external listeners (Discord, etc.)
+        foreach (var fwd in Forwarders)
+        {
+            try
+            {
+                fwd.Forward(message, identity);
+            }
+            catch { }
+        }
+    }
+
+    public static void LogInfo(string message, string identity)
+    {
+        // Log to master log
+        if (LogConfig.EnableMasterLog)
+            Logger.Log(LogLevel.Info, $"{identity} {message}");
+
+        // Handle per-bot logging
+        if (LogConfig.EnablePerBotLogging && !IsGlobalIdentity(identity))
+        {
+            if (IsTrainerIdentifier(identity))
+            {
+                // Identified bot - log directly to trainer folder
+                var botLogger = GetOrCreateBotLogger(identity);
+                botLogger.Log(LogLevel.Info, message);
+            }
+            else
+            {
+                // Early bot identifier (IP/USB) - buffer for later
+                LogBuffer.GetOrAdd(identity, _ => new List<BufferedLogEntry>())
+                    .Add(new BufferedLogEntry(LogLevel.Info, message, DateTime.Now));
+            }
+        }
+
+        // Forward to external listeners (Discord, etc.)
+        foreach (var fwd in Forwarders)
+        {
+            try
+            {
+                fwd.Forward(message, identity);
+            }
+            catch { }
+        }
+    }
+
+    public static void LogSuspicious(string message, string identity)
+    {
+        // Log to master log
+        if (LogConfig.EnableMasterLog)
+            Logger.Log(LogLevel.Warn, $"[SECURITY] {identity} {message}");
+
+        // Log to per-bot log
+        if (LogConfig.EnablePerBotLogging)
+        {
+            var botLogger = GetOrCreateBotLogger(identity);
+            botLogger.Log(LogLevel.Warn, $"[SECURITY] {message}");
+        }
+
+        // Forward to external listeners (Discord, etc.)
+        foreach (var fwd in Forwarders)
+        {
+            try
+            {
+                fwd.Forward($"[SECURITY] {message}", identity);
+            }
+            catch { }
+        }
     }
 
     public static void LogSafe(Exception exception, string identity)
