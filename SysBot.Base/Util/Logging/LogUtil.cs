@@ -2,8 +2,10 @@ using NLog;
 using NLog.Config;
 using NLog.Targets;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace SysBot.Base;
@@ -17,6 +19,17 @@ public static class LogUtil
     public static readonly List<ILogForwarder> Forwarders = [];
 
     private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+    // Cache of per-bot loggers to avoid recreating them
+    private static readonly ConcurrentDictionary<string, Logger> BotLoggers = new();
+
+    // Buffer for early bot logs before trainer identification
+    // Key: Connection IP/USB identifier, Value: List of buffered log entries
+    private static readonly ConcurrentDictionary<string, List<BufferedLogEntry>> LogBuffer = new();
+
+    private static readonly string WorkingDirectory = Path.GetDirectoryName(Environment.ProcessPath)!;
+
+    private record BufferedLogEntry(LogLevel Level, string Message, DateTime Timestamp);
 
     static LogUtil()
     {
@@ -46,13 +59,64 @@ public static class LogUtil
 
     public static DateTime LastLogged { get; private set; } = DateTime.Now;
 
-    public static void LogError(string message, string identity)
+    /// <summary>
+    /// Gets or creates a per-bot logger for the specified bot identity
+    /// </summary>
+    /// <param name="identity">Bot identifier (e.g., "USB-1", "192.168.1.100")</param>
+    /// <returns>Logger instance for the bot</returns>
+    private static Logger GetOrCreateBotLogger(string identity)
     {
-        Logger.Log(LogLevel.Error, $"{identity} {message}");
-        Log(message, identity);
+        if (!LogConfig.EnablePerBotLogging || !LogConfig.LoggingEnabled)
+            return Logger;
+
+        return BotLoggers.GetOrAdd(identity, botName =>
+        {
+            // Sanitize bot name for file system
+            var safeBotName = SanitizeBotName(botName);
+            var botLogDir = Path.Combine(WorkingDirectory, "logs", safeBotName);
+            Directory.CreateDirectory(botLogDir);
+
+            // Create a unique logger name to avoid conflicts
+            var loggerName = $"BotLogger_{safeBotName}";
+            var botLogger = LogManager.GetLogger(loggerName);
+
+            // Configure per-bot log target
+            var config = LogManager.Configuration ?? new LoggingConfiguration();
+
+            var fileName = LogConfig.IncludeTimestampInFilename
+                ? $"SysBotLog_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt"
+                : "SysBotLog.txt";
+
+            var botLogTarget = new FileTarget($"botlog_{safeBotName}")
+            {
+                FileName = Path.Combine(botLogDir, fileName),
+                ConcurrentWrites = true,
+
+                ArchiveEvery = FileArchivePeriod.Day,
+                ArchiveNumbering = ArchiveNumberingMode.Date,
+                ArchiveFileName = Path.Combine(botLogDir, "SysBotLog.{#}.txt"),
+                ArchiveDateFormat = "yyyy-MM-dd",
+                ArchiveAboveSize = LogConfig.MaxLogFileSize,
+                MaxArchiveFiles = LogConfig.MaxArchiveFiles,
+                Encoding = Encoding.Unicode,
+                WriteBom = true,
+                Layout = "${longdate}|${level:uppercase=true}|${logger}|${message}${onexception:inner=${newline}${exception:format=tostring}}"
+            };
+
+            config.AddTarget(botLogTarget);
+            config.AddRule(LogLevel.Debug, LogLevel.Fatal, botLogTarget, loggerName);
+
+            LogManager.Configuration = config;
+
+            return botLogger;
+        });
     }
 
-    public static void LogInfo(string message, string identity)
+    /// <summary>
+    /// Sanitizes bot name for use in file paths
+    /// Creates folders like: logs/HeXbyt3-483256/, logs/A-Z-734959/, logs/System/
+    /// </summary>
+    private static string SanitizeBotName(string botName)
     {
         if (string.IsNullOrWhiteSpace(botName))
             return "UnknownBot";
